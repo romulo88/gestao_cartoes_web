@@ -1,9 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
-import { BarraLimite, BarrasCategorias, GraficoMeses, ItensPorCategoria } from "@/components/graficos";
+import { agruparPorCategoria, BarraLimite, BarrasCategorias, GraficoMeses, RoscasPorCartao } from "@/components/graficos";
 import { Bolinha, Cartao } from "@/components/ui";
-import type { Dashboard } from "@/lib/api";
+import type { Dashboard, FaturasDoMes } from "@/lib/api";
 import { brl, diaMes, mesCurto } from "@/lib/format";
 
 /**
@@ -14,15 +15,17 @@ export function PainelVisao({
   dados,
   atual,
   onEscolherMes,
-  itensPorCategoria,
+  faturas,
   somenteLeitura = false,
 }: {
   dados: Dashboard;
   atual: string | null;
   onEscolherMes: (mes: string) => void;
-  itensPorCategoria: ItensPorCategoria | null;
+  /** Itens das faturas do mês: hint das categorias e roscas por cartão (null = sem esses extras). */
+  faturas: FaturasDoMes | null;
   somenteLeitura?: boolean;
 }) {
+  const itensPorCategoria = useMemo(() => (faturas ? agruparPorCategoria(faturas) : null), [faturas]);
   const variacao = dados.totalMesAnterior > 0 ? ((dados.totalMes - dados.totalMesAnterior) / dados.totalMesAnterior) * 100 : null;
   const comLimite = dados.cartoes.filter((c) => c.limite != null);
   const livreTotal = comLimite.reduce((s, c) => s + Math.max(0, c.limiteDisponivel ?? 0), 0);
@@ -113,6 +116,14 @@ export function PainelVisao({
           <BarrasCategorias categorias={dados.categorias} itens={itensPorCategoria} />
         </Cartao>
       </div>
+
+      {/* Só aparece com gasto no mês (e só se os itens das faturas carregaram). */}
+      {faturas && faturas.faturas.some((f) => f.itens.length > 0) && (
+        <Cartao>
+          <h2 className="mb-5 text-sm font-semibold text-slate-900">Categorias por cartão</h2>
+          <RoscasPorCartao faturas={faturas} />
+        </Cartao>
+      )}
     </div>
   );
 }

@@ -277,3 +277,141 @@ export function BarraLimite({ usado, limite }: { usado: number; limite: number }
     </div>
   );
 }
+
+// ---------- Categorias por cartão (rosca) ----------
+
+/** Fatias além desta quantidade viram "Outras" (pizza com muita fatia não se lê). */
+const MAX_FATIAS = 6;
+const COR_OUTRAS = "#cbd5e1";
+const COR_SEM_CATEGORIA = "#94a3b8";
+
+type Fatia = { chave: string; nome: string; cor: string; total: number };
+
+/** Gasto por categoria de UMA fatura (cartão), maiores primeiro, cauda dobrada em "Outras". */
+function fatiasDaFatura(fatura: FaturasDoMes["faturas"][number]): Fatia[] {
+  const mapa = new Map<string, Fatia>();
+  for (const i of fatura.itens) {
+    const chave = String(i.categoria?.id ?? "sem");
+    const f = mapa.get(chave) ?? {
+      chave,
+      nome: i.categoria?.nome ?? "Sem categoria",
+      cor: i.categoria?.cor ?? COR_SEM_CATEGORIA,
+      total: 0,
+    };
+    f.total += i.valor;
+    mapa.set(chave, f);
+  }
+  const ordenadas = [...mapa.values()].sort((a, b) => b.total - a.total);
+  if (ordenadas.length <= MAX_FATIAS) return ordenadas;
+  const cabeca = ordenadas.slice(0, MAX_FATIAS - 1);
+  const resto = ordenadas.slice(MAX_FATIAS - 1);
+  return [
+    ...cabeca,
+    { chave: "outras", nome: `Outras (${resto.length})`, cor: COR_OUTRAS, total: resto.reduce((s, f) => s + f.total, 0) },
+  ];
+}
+
+const RAIO = 40;
+const ESPESSURA = 16;
+const CIRCUNFERENCIA = 2 * Math.PI * RAIO;
+
+/** Rosca de uma fatura: total no miolo; hover/toque numa fatia (ou na legenda) mostra a fatia. */
+function RoscaCartao({ cartao, fatias }: { cartao: Ref; fatias: Fatia[] }) {
+  const [ativa, setAtiva] = useState<string | null>(null);
+  const total = fatias.reduce((s, f) => s + f.total, 0);
+  const destaque = fatias.find((f) => f.chave === ativa) ?? null;
+  // 2px de "respiro" entre fatias (cor da superfície), só quando há mais de uma.
+  const vao = fatias.length > 1 ? 1.5 : 0;
+
+  // Cada arco começa onde a soma das fatias anteriores termina.
+  const comprimentos = fatias.map((f) => (f.total / total) * CIRCUNFERENCIA);
+  const arcos = fatias.map((f, i) => ({
+    ...f,
+    comprimento: comprimentos[i],
+    inicio: comprimentos.slice(0, i).reduce((s, c) => s + c, 0),
+  }));
+
+  const pct = (v: number) => `${Math.round((v / total) * 100)}%`;
+  const entrar = (chave: string) => (e: React.PointerEvent) => e.pointerType === "mouse" && setAtiva(chave);
+  const alternar = (chave: string) => () => setAtiva((a) => (a === chave ? null : chave));
+
+  return (
+    <div onPointerLeave={(e) => e.pointerType === "mouse" && setAtiva(null)}>
+      <p className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-900">
+        <Bolinha cor={cartao.cor} className="h-3 w-3" /> {cartao.nome}
+      </p>
+      {/* Legenda ao lado quando cabe; senão desce para baixo da rosca (celular). */}
+      <div className="flex flex-wrap items-center justify-center gap-4">
+        <div className="relative h-32 w-32 shrink-0">
+          <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label={`Categorias do cartão ${cartao.nome}`}>
+            {arcos.map((a) => (
+              <circle
+                key={a.chave}
+                cx="50"
+                cy="50"
+                r={RAIO}
+                fill="none"
+                stroke={a.cor}
+                strokeWidth={ativa === a.chave ? ESPESSURA + 3 : ESPESSURA}
+                strokeDasharray={`${Math.max(a.comprimento - vao, 0.5)} ${CIRCUNFERENCIA}`}
+                strokeDashoffset={-a.inicio}
+                opacity={ativa && ativa !== a.chave ? 0.35 : 1}
+                className="cursor-pointer transition-[opacity,stroke-width]"
+                onPointerEnter={entrar(a.chave)}
+                onClick={alternar(a.chave)}
+              >
+                <title>{`${a.nome}: ${brl(a.total)} (${pct(a.total)})`}</title>
+              </circle>
+            ))}
+          </svg>
+          {/* Miolo: total da fatura, ou a fatia destacada. */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+            {destaque ? (
+              <>
+                <span className="w-full truncate text-[10px] text-slate-500">{destaque.nome}</span>
+                <span className="text-xs font-semibold text-slate-900">{brl(destaque.total)}</span>
+                <span className="text-[10px] text-slate-500">{pct(destaque.total)}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-[10px] text-slate-500">total</span>
+                <span className="text-xs font-semibold text-slate-900">{brl(total)}</span>
+              </>
+            )}
+          </div>
+        </div>
+        <ul className="min-w-[180px] flex-1 space-y-1 text-xs">
+          {fatias.map((f) => (
+            <li
+              key={f.chave}
+              onPointerEnter={entrar(f.chave)}
+              onClick={alternar(f.chave)}
+              className={`flex cursor-pointer items-center justify-between gap-2 rounded px-1 py-0.5 ${ativa === f.chave ? "bg-slate-100" : ""}`}
+            >
+              <span className="flex min-w-0 items-center gap-1.5 text-slate-700">
+                <Bolinha cor={f.cor} />
+                <span className="truncate">{f.nome}</span>
+              </span>
+              <span className="shrink-0 text-slate-900">
+                {brl(f.total)} <span className="text-slate-400">{pct(f.total)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+/** Uma rosca por cartão com gasto na fatura do mês. Nada lançado = não mostra nada. */
+export function RoscasPorCartao({ faturas }: { faturas: FaturasDoMes }) {
+  const comGasto = faturas.faturas.filter((f) => f.itens.length > 0);
+  if (comGasto.length === 0) return null;
+  return (
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {comGasto.map((f) => (
+        <RoscaCartao key={f.cartao.id} cartao={f.cartao} fatias={fatiasDaFatura(f)} />
+      ))}
+    </div>
+  );
+}

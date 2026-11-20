@@ -2,11 +2,10 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { IconeCartao } from "@/components/icones";
-import { agruparPorCategoria, ItensPorCategoria } from "@/components/graficos";
 import { PainelVisao } from "@/components/painel-visao";
 import { SeletorMes } from "@/components/seletor-mes";
 import { Cartao } from "@/components/ui";
-import { ApiError, Dashboard, painelPublicoDashboard, painelPublicoFaturas, painelPublicoInfo } from "@/lib/api";
+import { ApiError, Dashboard, FaturasDoMes, painelPublicoDashboard, painelPublicoFaturas, painelPublicoInfo } from "@/lib/api";
 import { NOME_PRODUTO } from "@/lib/marca";
 
 // O token vem depois do # (/ver#abc...): o navegador não manda o fragmento para servidor
@@ -24,7 +23,7 @@ export default function VerPainelPage() {
   const [atual, setAtual] = useState<string | null>(null);
   const [mes, setMes] = useState<string | null>(null);
   const [dados, setDados] = useState<Dashboard | null>(null);
-  const [itens, setItens] = useState<ItensPorCategoria | null>(null);
+  const [faturas, setFaturas] = useState<FaturasDoMes | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,8 +50,8 @@ export default function VerPainelPage() {
       .then((d) => !cancelado && setDados(d))
       .catch((e) => !cancelado && setErro(mensagem(e)));
     painelPublicoFaturas(token, mes)
-      .then((f) => !cancelado && setItens(agruparPorCategoria(f)))
-      .catch(() => !cancelado && setItens(null));
+      .then((f) => !cancelado && setFaturas(f))
+      .catch(() => !cancelado && setFaturas(null));
     return () => {
       cancelado = true;
     };
@@ -89,7 +88,7 @@ export default function VerPainelPage() {
               <h1 className="text-xl font-semibold text-slate-900">{dono ? `Painel de ${dono}` : "Painel"}</h1>
               {mes && <SeletorMes mes={mes} atual={atual} onChange={setMes} />}
             </div>
-            {dados && <PainelVisao dados={dados} atual={atual} onEscolherMes={setMes} itensPorCategoria={itens} somenteLeitura />}
+            {dados && <PainelVisao dados={dados} atual={atual} onEscolherMes={setMes} faturas={faturas} somenteLeitura />}
           </>
         )}
       </main>

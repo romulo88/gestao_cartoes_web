@@ -4,11 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AppShell, Titulo } from "@/components/app-shell";
 import { FormCompra } from "@/components/form-compra";
-import { agruparPorCategoria, ItensPorCategoria } from "@/components/graficos";
 import { PainelVisao } from "@/components/painel-visao";
 import { SeletorMes } from "@/components/seletor-mes";
 import { Button, Cartao, Erro } from "@/components/ui";
-import { dashboard, Dashboard, faturaAtual, faturasDoMes } from "@/lib/api";
+import { dashboard, Dashboard, faturaAtual, faturasDoMes, FaturasDoMes } from "@/lib/api";
 import { useDadosBase } from "@/lib/use-dados-base";
 import { useSessaoObrigatoria } from "@/lib/use-sessao";
 
@@ -21,7 +20,7 @@ export default function PainelPage() {
   const [dados, setDados] = useState<Dashboard | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [formAberto, setFormAberto] = useState(false);
-  const [itensPorCategoria, setItensPorCategoria] = useState<ItensPorCategoria | null>(null);
+  const [faturas, setFaturas] = useState<FaturasDoMes | null>(null);
 
   useEffect(() => {
     if (!sessao) return;
@@ -41,10 +40,10 @@ export default function PainelPage() {
         setErro(null);
       })
       .catch((e) => setErro(e.message));
-    // Itens da fatura, para o hint de cada categoria. Se falhar, o painel segue sem hint.
+    // Itens das faturas: hint das categorias e roscas por cartão. Se falhar, o painel segue sem eles.
     faturasDoMes(mes)
-      .then((f) => setItensPorCategoria(agruparPorCategoria(f)))
-      .catch(() => setItensPorCategoria(null));
+      .then(setFaturas)
+      .catch(() => setFaturas(null));
   }, [mes]);
 
   useEffect(() => {
@@ -79,7 +78,7 @@ export default function PainelPage() {
         </Cartao>
       )}
 
-      {dados && <PainelVisao dados={dados} atual={atual} onEscolherMes={setMes} itensPorCategoria={itensPorCategoria} />}
+      {dados && <PainelVisao dados={dados} atual={atual} onEscolherMes={setMes} faturas={faturas} />}
 
       <FormCompra
         key={formAberto ? "aberto" : "fechado"}
